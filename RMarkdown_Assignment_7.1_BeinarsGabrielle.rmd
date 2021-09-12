@@ -1,0 +1,134 @@
+---
+title: "RMarkdown_Assignment_7.1_BeinarsGabrielle"
+author: "Gabrielle Beinars"
+date: "1/20/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(knitr)
+library(ggplot2)
+library(ggm)
+library(QuantPsyc)
+library(car)
+housing <- read_excel("week-7-housing.xlsx")
+housing_DF <- data.frame(housing, rm.na = TRUE)
+housing_DF
+```
+
+
+### Question b
+Below are two seperate variables created; sales_feet to include Sale Price and Square Foot of Lot and pred_variables which includes predictors, Sale Price, Bedrooms and Bath Full Count.
+
+```{r variables}
+sales_feet <- subset(housing_DF, select = c("Sale.Price", "sq_ft_lot"))
+sales_feet
+pred_variables <- subset(housing_DF, select = c("Sale.Price", "sq_ft_lot", "bedrooms", "bath_full_count"))
+pred_variables
+```
+
+### Question c
+Below are the summaries of two regression models.  The R2 and adjusted R2 when looking at Sale Price as a function of Square Foot of Lot are 0.014 (correlation coefficient) and 0.014 (coefficient of determination), respectively. This means that 1.4% of variability in Sale Price is shared with Square Foot of Lot, leaving 98.6% of variability not explained by Square Foot of Lot. When looking at Sale Price as a function of Square Foot of Lot, Bedrooms and Bath Full Count, the R2 and adjusted R2 are 0.113 and 0.113, respectively. We do see more variability shared here, with 11.3%, when adding in additional predictors for Sale Price. Including the additional predictors do explain more variation than the first model (9.9% more of variability). I would conclude that the second model fits better than the first model, but still leaves 88.7% of variability not explained by Square Foot of Lot, Bedrooms or Bath Full Count. Since our R2 and adjusted R2 are very close for both models, this indicates that the cross-validity of the model is good.
+
+```{r model summary}
+reg_mod_1 <- lm(Sale.Price ~ sq_ft_lot, data = sales_feet)
+reg_mod_2 <- lm(Sale.Price ~ sq_ft_lot + bedrooms + bath_full_count, data = pred_variables)
+summary(reg_mod_1)
+summary(reg_mod_2)
+```
+
+### Question d
+The standardized betas for each parameter are 0.102 for Square Foot of Lot, 0.149 for Bedrooms, and 0.235 for Bath Full Count. These values tell us the number of standard deviations by which the outcome will change as a result of one standard deviation change in our predictor. For example, a standardized beta of 0.102 for Square Foot of Lot indicates that as the Square Foot of Lot increases by one standard deviation, the Sale Price increases by 0.102 standard deviations. The Bedrooms and Bath Full Count must be held constant for this interpretation to hold true. This is the same for the other predictor standardized betas. A standardized beta of 0.149 for bedrooms indicates that as long as square foot of lot and bath full count are held constant, as the bedrooms increase by one standard deviation, the sale price increases by 0.149 standard deviations.
+
+```{r standardized beta}
+lm.beta(reg_mod_2)
+```
+
+### Question e
+The confidence intervals for the parameters in the model are shown below. The results indicate a good model as the confidence intervals do not cross zero. The better predictors will have tighter confidence intervals indicating that the estimates for the current model are likely to be representative of the true population values. The wider the confidence intervals, the less representative, although still significant because they do not cross zero. Based on this, I would consider square foot of lot and bath full count to be better predictors than bedrooms, although bedrooms is still significant but less representative.
+
+``` {r confidence intervals}
+confint(reg_mod_2)
+round(confint(reg_mod_2))
+```
+
+### Question f
+Below is an analysis of variance of the original model and the model containing the additional predictors. It can be said that F(2, 12861) = 712.43, p < 0.001, which means the degrees of freedom is 2 and 12,861 is our number of cases - the number of predictors in the new model - 1. The calculated change in the F-ratio is 712.43. With our Pr(>F) value of <2.2e-16, it can be said that our second model significantly improved the fit of the model to data compared to the first model.
+
+``` {r analysis of variance}
+anova(reg_mod_1, reg_mod_2)
+```
+
+### Question g
+Below is casewise diagnostics to identify outliers by residuals, standardized residuals, and studentized residuals, and influential cases by Cook's distance, DFBeta, DFFit, hat values and convariance ratio. A new data frame, casewise_diagnostics, was created to store these variables.
+
+```{r casewise diagnostics}
+casewise_diagnostic <- data.frame(pred_variables)
+casewise_diagnostic$residuals <- resid(reg_mod_2)
+casewise_diagnostic$standardized.residuals <- rstandard(reg_mod_2)
+casewise_diagnostic$studentized.residuals <- rstudent(reg_mod_2)
+casewise_diagnostic$cooks.distance <- cooks.distance(reg_mod_2)
+casewise_diagnostic$dfbeta <- dfbeta(reg_mod_2)
+casewise_diagnostic$dffit <- dffits(reg_mod_2)
+casewise_diagnostic$leverage <- hatvalues(reg_mod_2)
+casewise_diagnostic$covariance.ratios <- covratio(reg_mod_2)
+round(casewise_diagnostic, digits = 3)
+```
+
+### Question h
+Below a seperate variable has been created to store the large residuals (large_residual), which tells us True or False. True that it is a large residual, greater than 2 or less than -2, or False that the residual falls between 2 and -2. 
+
+```{r standard residuals}
+casewise_diagnostic$large_residual <- casewise_diagnostic$standardized.residuals > 2 | casewise_diagnostic$standardized.residuals < -2
+```
+
+### Question i
+Below the sum of large residuals is calculated as 329.
+
+```{r sum of lg residuals}
+sum(casewise_diagnostic$large_residual)
+```
+
+### Question j
+Below is a list of the 329 cases which evaluate as TRUE meaning they have large residuals. With 329 cases out of a total of 12,865 cases, this is 2.6% with large residuals. A standardized residual of greater than 3 or less than -3 is large enough to investigate further as an outlier. No more than 5% of our cases (2.6%) have absolute values above 2.
+
+```{r lg residuals}
+casewise_diagnostic[casewise_diagnostic$large_residual, c("Sale.Price", "sq_ft_lot", "bedrooms", "bath_full_count", "standardized.residuals")]
+```
+
+### Question k
+Below we look into our cases with large residuals a little further. To begin with Cook's distance, we look for values greater than 1, which is only case 295, meaning this case may be having undue influence on the model. For leverage, the average leverage is calculated as (k+1)/n where k is the number of predictors (3) and n is the number of cases. Our average leverage is calculated as (3+1)/12865 = 0.00031. If no cases exert undue influence over the model, then all of the leverage values should be close to this number. Cases greater than double or triple the average leverage should be investigated further. Based on this, there are many cases with leverage value greater than 0.0006 and 0.0009 (cases 25, 115, 344, 345, 482, 508, 679, 877, 916, 1155, 1442, 1492, 1870, 2020, 2243, 2361, 2717, 2852, 3065, 3132, 4248, 4648, 4750, 4840, 5195, 5924, 6739, 6766, 6943, 7210, 7629, 8717, 8887, 8911, 8946, 9507, 9528, 9730, 10131, 10624, 11631, 11728, 11747, 11906, 11982, 11992, 12218, 12255, 12256, 12577, 12764), but cases 295 (0.090), 2699 (0.0235), 4649 (0.0414), 5083 (0.0299), 5084 (0.0298), 8377 (0.0623), and 11899 (0.0327) are very much outside this boundary. When looking at covariance ratios, we are looking for values that deviate substantially outside CVR > 1 + [3(k + 1)/n] = 1.0009 and CR < 1 - [3(k + 1)/n] = 0.9991. Cases 295 (1.07) and 8377 (1.06) deviate substantially outside this range. I would consider case 295 as problematic based on these three analyses and I would question case 8377, based on leverage and covariance ratio, but as this value has an acceptable Cook's distance, it may not be problematic. 
+```{r further investigate}
+casewise_diagnostic[casewise_diagnostic$large_residual, c("cooks.distance", "leverage", "covariance.ratios")]
+```
+
+### Question l
+Below the Durbin Watson Test is used to test the assumption of independent errors. Our value is less than 1 (0.703) meaning that our assumption was not met. Our p-value is 0, less than 0.05, therefore significant. 
+
+```{r assess independence}
+dwt(reg_mod_2)
+```
+
+### Question m
+Below are calculations to assess collinearity; VIF, tolerance and mean VIF. The largest VIF is 1.104 (bedrooms and bath_full_count), less than 10, therefore there is no cause for concern. Our average VIF is 1.07, which is greater than 1, but not substantially. If it was substantially greater than 1, then the regression may be biased. All of our tolerance statistics are well above 0.1 and 0.2, whereas if these values were below, it may indicate a serious or potential problem. Based on these results, we can conclude that there is no collinearity within our data.
+
+```{r assess multicollinearity}
+vif(reg_mod_2)
+1/vif(reg_mod_2)
+mean(vif(reg_mod_2))
+```
+
+### Question n
+The first plot created is of fitted values against residuals. This should look like a random array of dots evenly dispersed around zero, but it does not. Funnelling indicates heteroscedasticity and curving means that the data may violate the assumption of linearity. We do see curving below and some heteroscedasticity. At one side of our plot, the data points are close together, while towards the top and right side they are more widely dispersed. This indicates that our assumptions were not met. The second plot is the Q-Q plot, where the straight line represents a normal distribution and the points represent the observed residuals. Our plot shows that the residuals do deviate from normality. At the extremes, the dots are distant from the line indicating skewness. Our third and fourth plots created also do not show that are dots are evenly dispersed around zero. The third plot shows funnelling where towards the bottom our dots are clustered, but more widely dispersed towards the top. The fourth plot shows clustering around 0, but not evenly dispersed as we can see funnelling towards the right.
+From looking at our histogram of studentized residuals, it appears to be non-normal. We have a leptokurtic distribution (pointy distribution) that appears slightly positively skewed where our tail points toward the higher values. 
+Based on the graphs created, we do see violations of the assumptions, both homogeneity of variance and linearity, which means we should question the validity of our model. 
+
+```{r checking assumptions, echo = FALSE}
+plot(reg_mod_2)
+hist(casewise_diagnostic$studentized.residuals)
+```
+
+### Question o
+If our assumptions about the residuals were met (Question n), then we could conclude that this model appears accurate for the sample and generalizable to the population. As our assumptions about the residuals were not met, we cannot say that this regression model is unbiased. According to section 7.9.6, we can have a good model with our assumptions being violated, but only to draw conclusions about our sample. Assumptions are important when generalizing beyond our sample to our population.
